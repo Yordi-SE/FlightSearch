@@ -1,14 +1,5 @@
 package models
 
-
-
-
-// BaggageInfo represents baggage allowance for a passenger type
-type BaggageInfo struct {
-	PassengerType string `json:"passenger_type"` 
-	Allowance     string `json:"allowance"`      
-}
-
 type Location struct {
 	LocationCode string `json:"LocationCode"`
 	LocationType string `json:"LocationType"`
