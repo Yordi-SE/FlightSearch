@@ -6,17 +6,27 @@ import (
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"
 )
 
-// parseSabreResponse converts Sabre's response to our Flight model
+// ParseSabreResponse converts Sabre's API response into our internal Flight model
+// Args:
+//
+//	resp - The raw response from Sabre API
+//	req - The original flight search request
+//
+// Returns:
+//
+//	Pointer to FlightSearchResponse containing parsed flights and any error encountered
 func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*DTO.FlightSearchResponse, error) {
 	var flights DTO.FlightSearchResponse
 
-	// Map baggage allowances by ID
+	// Create a mapping of baggage allowance descriptions using ID as key
+	// Format: "2PC" indicates 2 pieces allowed
 	baggageMap := make(map[int]string)
 	for _, allowance := range resp.GroupedItineraryResponse.BaggageAllowanceDescs {
 		baggageMap[allowance.ID] = fmt.Sprintf("%dPC", allowance.PieceCount)
 	}
 
-	// Map schedules by ID
+	// Create a mapping of flight schedules using schedule ID as key
+	// Stores essential flight details for quick lookup
 	scheduleMap := make(map[int]struct {
 		FlightNumber  string
 		Origin        string
@@ -40,8 +50,9 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 		}
 	}
 
-	// Map legs by ID
-	legMap := make(map[int][]int) // Maps leg ID to schedule refs
+	// Create a mapping of leg descriptions to their schedule references
+	// Maps leg ID to array of schedule IDs
+	legMap := make(map[int][]int)
 	for _, leg := range resp.GroupedItineraryResponse.LegDescs {
 		var schedRefs []int
 		for _, sched := range leg.Schedules {
@@ -50,10 +61,11 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 		legMap[leg.ID] = schedRefs
 	}
 
-	// Process itineraries
+	// Process each itinerary group and its pricing information
 	for _, group := range resp.GroupedItineraryResponse.ItineraryGroups {
 		for _, itin := range group.Itineraries {
 			for _, pricing := range itin.PricingInformation {
+				// Skip if no passenger info available
 				if len(pricing.Fare.PassengerInfoList) == 0 {
 					continue
 				}
@@ -61,18 +73,17 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 				totalPrice := pricing.Fare.TotalFare.TotalPrice
 				numLegs := len(itin.Legs)
 
-				// Build baggage info per segment
+				// Build baggage information mapping per segment
 				baggageInfo := make(map[int]string)
 				for _, bag := range passengerInfo.BaggageInformation {
-					allowance, ok := baggageMap[bag.Allowance.Ref]
-					if ok {
+					if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
 						for _, seg := range bag.Segments {
 							baggageInfo[seg.ID] = allowance
 						}
 					}
 				}
 
-				// Process each leg
+				// Process each leg of the itinerary
 				for i, legRef := range itin.Legs {
 					legID := legRef.Ref
 					schedRefs, ok := legMap[legID]
@@ -80,8 +91,10 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 						continue
 					}
 
+					// Process each schedule in the leg
 					for idx, schedRef := range schedRefs {
 						if flightData, ok := scheduleMap[schedRef]; ok {
+							// Build baggage info for each passenger type
 							baggage := []DTO.BaggageInfo{}
 							for _, p := range req.Passengers {
 								if allowance, exists := baggageInfo[idx]; exists {
@@ -92,16 +105,18 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 								}
 							}
 
+							// Format departure time with date
 							departureDate := group.GroupDescription.LegDescriptions[i].DepartureDate
 							departureTime := fmt.Sprintf("%sT%s", departureDate, flightData.DepartureTime[:8])
 
+							// Add flight to response
 							flights.Flights = append(flights.Flights, DTO.Flight{
 								FlightNumber:  flightData.FlightNumber,
 								Origin:        flightData.Origin,
 								Destination:   flightData.Destination,
 								DepartureTime: departureTime,
 								ArrivalTime:   fmt.Sprintf("%sT%s", departureDate, flightData.ArrivalTime[:8]),
-								Price:         totalPrice / float64(numLegs),
+								Price:         totalPrice / float64(numLegs), // Split total price across legs
 								Baggage:       baggage,
 							})
 						}
@@ -111,12 +126,22 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 		}
 	}
 
+	// Log the number of flights parsed
 	fmt.Println("Parsed Flights:", len(flights.Flights))
 	return &flights, nil
 }
 
-// buildSabreRequest constructs the Sabre API request payload
+// BuildSabreRequest constructs the request payload for Sabre API
+// Args:
+//
+//	req - The flight search request from the client
+//	PCC - Pseudo City Code for authentication
+//
+// Returns:
+//
+//	Formatted Sabre request structure
 func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreRequestFormat {
+	// Convert passenger info to Sabre format
 	passengers := []DTO.PassengerTypeQuantity{}
 	for _, p := range req.Passengers {
 		passengers = append(passengers, DTO.PassengerTypeQuantity{
@@ -125,11 +150,12 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 		})
 	}
 
+	// Build origin-destination information for one-way trip
 	originDest := []DTO.OriginDest{
 		{
 			OriginLocation: DTO.Location{
 				LocationCode: req.Origin,
-				LocationType: "A",
+				LocationType: "A", // Airport
 			},
 			DestinationLocation: DTO.Location{
 				LocationCode: req.Destination,
@@ -138,6 +164,8 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 			DepartureDateTime: req.DepartureDateTime,
 		},
 	}
+
+	// Add return leg if round trip
 	if req.TripType == "round_trip" {
 		originDest = append(originDest, DTO.OriginDest{
 			OriginLocation:      DTO.Location{LocationCode: req.Destination, LocationType: "A"},
@@ -146,6 +174,7 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 		})
 	}
 
+	// Construct and return the complete Sabre request
 	return DTO.SabreRequestFormat{
 		OTA_AirLowFareSearchRQ: DTO.OTA_AirLowFareSearchRQ{
 			Version: "5",
@@ -172,17 +201,17 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 				},
 			},
 			TravelPreferences: DTO.TravelPreferences{
-				MaxStopsQuantity: 0,
+				MaxStopsQuantity: 0, // Direct flights only
 				VendorPref: []DTO.VendorPref{
 					{
-						Code: "LO",
+						Code: "LO", // Example airline code
 					},
 				},
 			},
 			TPA_Extensions: DTO.TPAExtensions{
 				IntelliSellTransaction: DTO.IntelliSellTransaction{
 					RequestType: DTO.RequestType{
-						Name: "50ITINS",
+						Name: "50ITINS", // Request up to 50 itineraries
 					},
 				},
 			},

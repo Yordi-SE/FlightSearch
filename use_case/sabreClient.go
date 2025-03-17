@@ -11,65 +11,103 @@ import (
 	"github.com/Yordi-SE/FlightSearch/utils"
 )
 
+// SabreClient represents a client for interacting with the Sabre API
 type SabreClient struct {
-	ClientID     string
-	ClientSecret string
-	Token        string
-	URL          string
-	PCC          string
+	ClientID     string // API client ID for authentication
+	ClientSecret string // API client secret for authentication
+	Token        string // Current access token (refreshed as needed)
+	URL          string // Sabre API endpoint URL
+	PCC          string // Pseudo City Code for agency identification
 }
 
+// NewSabreClient creates and initializes a new SabreClient instance
+// Args:
+//
+//	clientID - The API client ID
+//	clientSecret - The API client secret
+//	PCC - Pseudo City Code
+//	url - The Sabre API endpoint
+//
+// Returns:
+//
+//	Pointer to a new SabreClient instance
 func NewSabreClient(clientID, clientSecret string, PCC string, url string) *SabreClient {
-	return &SabreClient{ClientID: clientID, ClientSecret: clientSecret, PCC: PCC, URL: url}
+	return &SabreClient{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		PCC:          PCC,
+		URL:          url,
+	}
 }
 
-// SearchFlights calls the Bargain Finder Max API
+// SearchFlights executes a flight search using Sabre's Bargain Finder Max API
+// Args:
+//
+//	req - The flight search request containing search parameters
+//
+// Returns:
+//
+//	Pointer to FlightSearchResponse with search results or an error if the request fails
 func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSearchResponse, error) {
+	// Ensure we have a valid token; fetch one if not present
 	if c.Token == "" {
 		if err := c.GetToken(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to obtain authentication token: %v", err)
 		}
 	}
-	
+
+	// Build the Sabre-specific request format from our internal request
 	sabreReq := utils.BuildSabreRequest(req, c.PCC)
-	fmt.Printf("Request: %+v\n", sabreReq)
+	fmt.Printf("Request: %+v\n", sabreReq) // Log request for debugging
+
+	// Marshal the request into JSON
 	payload, err := json.Marshal(sabreReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
+	// Create HTTP request
 	httpReq, err := http.NewRequest("POST", c.URL, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flight request: %v", err)
 	}
 
+	// Set required headers
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.Token)
 
+	// Execute the request
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("flight request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // Ensure body is closed after we're done
+
+	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
+
+	// Log response details for debugging
 	fmt.Println("Status Code:", resp.StatusCode)
 	fmt.Println("Response Body:", string(body))
+
+	// Check if the request was successful
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("flight request returned status %d: %s", resp.StatusCode, string(body))
 	}
 
+	// Parse the Sabre response into our structure
 	var sabreResp DTO.SabreResponse
 	if err := json.Unmarshal(body, &sabreResp); err != nil {
-		// Log the raw response for debugging and return a generic error
+		// Log raw response for debugging and return a detailed error
 		fmt.Println("Failed to unmarshal response:", err)
 		return nil, fmt.Errorf("invalid response format from Sabre API: %v (raw response: %s)", err, string(body))
 	}
 
+	// Handle specific error messages from Sabre
 	for _, msg := range sabreResp.GroupedItineraryResponse.Messages {
 		if msg.Severity == "Error" {
 			switch msg.Text {
@@ -83,6 +121,7 @@ func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSe
 		}
 	}
 
+	// Check if any itineraries were found
 	if sabreResp.GroupedItineraryResponse.Statistics.ItineraryCount == 0 {
 		for _, msg := range sabreResp.GroupedItineraryResponse.Messages {
 			if msg.Type == "SCHEDULES" && msg.Text == "NO FLIGHT SCHEDULES FOR QUALIFIERS USED" {
@@ -91,5 +130,7 @@ func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSe
 		}
 		return nil, fmt.Errorf("no flights available for your search; try adjusting your dates or preferences")
 	}
+
+	// Parse the response into our flight model and return
 	return utils.ParseSabreResponse(sabreResp, req)
 }
