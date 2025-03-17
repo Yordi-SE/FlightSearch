@@ -10,12 +10,12 @@ import (
 
 // SearchFlights is a controller that handles flight search requests
 type Controller struct {
-	SabreClient interfaces.UseScase
+	FlightClient interfaces.UseScase
 }
 
 // NewController returns a new Controller instance
 func NewController(client interfaces.UseScase) *Controller {
-	return &Controller{SabreClient: client}
+	return &Controller{FlightClient: client}
 }
 
 func (ctrl *Controller) SearchFlights(c *gin.Context) {
@@ -28,7 +28,7 @@ func (ctrl *Controller) SearchFlights(c *gin.Context) {
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 	}
-	result, err := ctrl.SabreClient.SearchFlights(&req)
+	result, err := ctrl.FlightClient.SearchFlights(&req)
 	fmt.Println(result)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
