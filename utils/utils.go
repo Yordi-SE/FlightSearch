@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 
-	"github.com/Yordi-SE/FlightSearch/models"
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"
 )
 
@@ -117,22 +116,22 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 }
 
 // buildSabreRequest constructs the Sabre API request payload
-func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) models.SabreRequestFormat {
-	passengers := []models.PassengerTypeQuantity{}
+func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreRequestFormat {
+	passengers := []DTO.PassengerTypeQuantity{}
 	for _, p := range req.Passengers {
-		passengers = append(passengers, models.PassengerTypeQuantity{
+		passengers = append(passengers, DTO.PassengerTypeQuantity{
 			Code:     p.Type,
 			Quantity: p.Count,
 		})
 	}
 
-	originDest := []models.OriginDest{
+	originDest := []DTO.OriginDest{
 		{
-			OriginLocation: models.Location{
+			OriginLocation: DTO.Location{
 				LocationCode: req.Origin,
 				LocationType: "A",
 			},
-			DestinationLocation: models.Location{
+			DestinationLocation: DTO.Location{
 				LocationCode: req.Destination,
 				LocationType: "A",
 			},
@@ -140,22 +139,22 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) models.SabreReq
 		},
 	}
 	if req.TripType == "round_trip" {
-		originDest = append(originDest, models.OriginDest{
-			OriginLocation:      models.Location{LocationCode: req.Destination, LocationType: "A"},
-			DestinationLocation: models.Location{LocationCode: req.Origin, LocationType: "A"},
+		originDest = append(originDest, DTO.OriginDest{
+			OriginLocation:      DTO.Location{LocationCode: req.Destination, LocationType: "A"},
+			DestinationLocation: DTO.Location{LocationCode: req.Origin, LocationType: "A"},
 			DepartureDateTime:   req.ReturnDateTime,
 		})
 	}
 
-	return models.SabreRequestFormat{
-		OTA_AirLowFareSearchRQ: models.OTA_AirLowFareSearchRQ{
+	return DTO.SabreRequestFormat{
+		OTA_AirLowFareSearchRQ: DTO.OTA_AirLowFareSearchRQ{
 			Version: "5",
-			POS: models.POS{
-				Source: []models.Source{
+			POS: DTO.POS{
+				Source: []DTO.Source{
 					{
 						PseudoCityCode: PCC,
-						RequestorID: models.RequestorID{
-							CompanyName: models.CompanyName{
+						RequestorID: DTO.RequestorID{
+							CompanyName: DTO.CompanyName{
 								Code: "TN",
 							},
 							ID:   "1",
@@ -165,24 +164,24 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) models.SabreReq
 				},
 			},
 			OriginDestinationInformation: originDest,
-			TravelerInfoSummary: models.TravelerInfoSummary{
-				AirTravelerAvail: []models.AirTravelerAvail{
+			TravelerInfoSummary: DTO.TravelerInfoSummary{
+				AirTravelerAvail: []DTO.AirTravelerAvail{
 					{
 						PassengerTypeQuantity: passengers,
 					},
 				},
 			},
-			TravelPreferences: models.TravelPreferences{
+			TravelPreferences: DTO.TravelPreferences{
 				MaxStopsQuantity: 0,
-				VendorPref: []models.VendorPref{
+				VendorPref: []DTO.VendorPref{
 					{
 						Code: "LO",
 					},
 				},
 			},
-			TPA_Extensions: models.TPAExtensions{
-				IntelliSellTransaction: models.IntelliSellTransaction{
-					RequestType: models.RequestType{
+			TPA_Extensions: DTO.TPAExtensions{
+				IntelliSellTransaction: DTO.IntelliSellTransaction{
+					RequestType: DTO.RequestType{
 						Name: "50ITINS",
 					},
 				},
