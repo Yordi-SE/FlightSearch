@@ -7,10 +7,10 @@ import (
 )
 
 // New returns a new Router instance
-func NewRouter(Sabre interfaces.UseScase) {
+func NewRouter(FlightClient interfaces.UseScase) {
 	router := gin.Default()
 
-	Controller := controller.NewController(Sabre)
+	Controller := controller.NewController(FlightClient)
 	router.POST("/flight/search", Controller.SearchFlights)
 	router.Run(":8080")
 
