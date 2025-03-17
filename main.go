@@ -20,7 +20,7 @@ func main() {
 		log.Fatal("Error loading config", err)
 	}
 
-	SabreClient := use_case.NewSabreClient(Config.ClientID, Config.ClientSecret, Config.PCC)
+	SabreClient := use_case.NewSabreClient(Config.ClientID, Config.ClientSecret, Config.PCC,Config.URL)
 	error := SabreClient.GetToken()
 	if error != nil {
 		log.Fatal("Error getting token", error)

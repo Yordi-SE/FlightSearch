@@ -3,18 +3,18 @@ package controller
 import (
 	"fmt"
 
-	"github.com/Yordi-SE/FlightSearch/use_case"
+	interfaces "github.com/Yordi-SE/FlightSearch/Interfaces"
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"
 	"github.com/gin-gonic/gin"
 )
 
 // SearchFlights is a controller that handles flight search requests
 type Controller struct {
-	SabreClient *use_case.SabreClient
+	SabreClient interfaces.UseScase
 }
 
 // NewController returns a new Controller instance
-func NewController(client *use_case.SabreClient) *Controller {
+func NewController(client interfaces.UseScase) *Controller {
 	return &Controller{SabreClient: client}
 }
 

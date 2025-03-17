@@ -19,6 +19,9 @@ type OTA_AirLowFareSearchRQ struct {
 	TravelerInfoSummary          TravelerInfoSummary `json:"TravelerInfoSummary"`
 	TPA_Extensions               TPAExtensions       `json:"TPA_Extensions"`
 }
+type SabreRequestFormat struct {
+	OTA_AirLowFareSearchRQ OTA_AirLowFareSearchRQ `json:"OTA_AirLowFareSearchRQ"`
+}
 type POS struct {
 	Source []Source `json:"Source"`
 }

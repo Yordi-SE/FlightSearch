@@ -11,6 +11,7 @@ type Config struct {
 	ClientID     string
 	ClientSecret string
 	PCC          string
+	URL          string
 }
 
 // New returns a new Config instance
@@ -19,6 +20,7 @@ func New() (*Config, error) {
 		ClientID:     os.Getenv("CLIENTID"),
 		ClientSecret: os.Getenv("CLIENTSECRET"),
 		PCC:          os.Getenv("PCC"),
+		URL:          os.Getenv("URL"),
 	}
 
 	if c.ClientID == "" {

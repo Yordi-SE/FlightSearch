@@ -1,13 +1,13 @@
 package router
 
 import (
+	interfaces "github.com/Yordi-SE/FlightSearch/Interfaces"
 	"github.com/Yordi-SE/FlightSearch/delivery/controller"
-	"github.com/Yordi-SE/FlightSearch/use_case"
 	"github.com/gin-gonic/gin"
 )
 
 // New returns a new Router instance
-func NewRouter(Sabre *use_case.SabreClient) {
+func NewRouter(Sabre interfaces.UseScase) {
 	router := gin.Default()
 
 	Controller := controller.NewController(Sabre)
