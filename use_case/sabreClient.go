@@ -25,7 +25,7 @@ func NewSabreClient(clientID, clientSecret string, PCC string) *SabreClient {
 // GetToken fetches an OAuth token from Sabre's authentication API
 
 // SearchFlights calls the Bargain Finder Max API
-func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) ([]models.Flight, error) {
+func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSearchResponse, error) {
 	if c.Token == "" {
 		if err := c.GetToken(); err != nil {
 			return nil, err
@@ -211,8 +211,8 @@ func (c *SabreClient) buildSabreRequest(req *DTO.FlightSearchRequest) models.OTA
 }
 
 // parseSabreResponse converts Sabre's response to our Flight model
-func parseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) ([]models.Flight, error) {
-	var flights []models.Flight
+func parseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*DTO.FlightSearchResponse, error) {
+	var flights DTO.FlightSearchResponse
 
 	// Map baggage allowances by ID
 	baggageMap := make(map[int]string)
@@ -286,10 +286,10 @@ func parseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) ([
 
 					for idx, schedRef := range schedRefs {
 						if flightData, ok := scheduleMap[schedRef]; ok {
-							baggage := []models.BaggageInfo{}
+							baggage := []DTO.BaggageInfo{}
 							for _, p := range req.Passengers {
 								if allowance, exists := baggageInfo[idx]; exists {
-									baggage = append(baggage, models.BaggageInfo{
+									baggage = append(baggage, DTO.BaggageInfo{
 										PassengerType: p.Type,
 										Allowance:     allowance,
 									})
@@ -299,7 +299,7 @@ func parseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) ([
 							departureDate := group.GroupDescription.LegDescriptions[i].DepartureDate
 							departureTime := fmt.Sprintf("%sT%s", departureDate, flightData.DepartureTime[:8])
 
-							flights = append(flights, models.Flight{
+							flights.Flights = append(flights.Flights, DTO.Flight{
 								FlightNumber:  flightData.FlightNumber,
 								Origin:        flightData.Origin,
 								Destination:   flightData.Destination,
@@ -315,6 +315,6 @@ func parseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) ([
 		}
 	}
 
-	fmt.Println("Parsed Flights:", len(flights))
-	return flights, nil
+	fmt.Println("Parsed Flights:", len(flights.Flights))
+	return &flights, nil
 }

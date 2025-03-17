@@ -2,26 +2,11 @@ package models
 
 
 
-// FlightSearchResponse represents the output of a flight search
-type FlightSearchResponse struct {
-	Flights []Flight `json:"flights"` // List of flight options
-}
-
-// Flight represents a single flight option
-type Flight struct {
-	FlightNumber  string        `json:"flight_number"`  // e.g., "AA123"
-	Origin        string        `json:"origin"`         // IATA airport code (e.g., "JFK")
-	Destination   string        `json:"destination"`    // IATA airport code (e.g., "LAX")
-	DepartureTime string        `json:"departure_time"` // Format: "YYYY-MM-DDTHH:MM:SS"
-	ArrivalTime   string        `json:"arrival_time"`   // Format: "YYYY-MM-DDTHH:MM:SS"
-	Price         float64       `json:"price"`          // Price per flight in USD (or currency from API)
-	Baggage       []BaggageInfo `json:"baggage"`        // Baggage allowance per passenger type
-}
 
 // BaggageInfo represents baggage allowance for a passenger type
 type BaggageInfo struct {
-	PassengerType string `json:"passenger_type"` // e.g., "ADT", "CNN"
-	Allowance     string `json:"allowance"`      // e.g., "1PC 23kg"
+	PassengerType string `json:"passenger_type"` 
+	Allowance     string `json:"allowance"`      
 }
 
 type Location struct {
