@@ -28,7 +28,7 @@ func main() {
 
 	// Create a new Sabre client instance with configuration details
 	// The client will be used to interact with Sabre's API
-	SabreClient := use_case.NewSabreClient(
+	FlightClient := use_case.NewSabreClient(
 		Config.ClientID,     // Sabre API Client ID
 		Config.ClientSecret, // Sabre API Client Secret
 		Config.PCC,          // Pseudo City Code for agency identification
@@ -37,7 +37,7 @@ func main() {
 
 	// Attempt to retrieve an authentication token from Sabre
 	// This is required before making any API calls
-	error := SabreClient.GetToken()
+	error := FlightClient.GetToken()
 	if error != nil {
 		// If token retrieval fails, log the error and terminate
 		log.Fatal("Error getting token", error)
@@ -45,5 +45,5 @@ func main() {
 
 	// Initialize and start the HTTP router with the Sabre client
 	// This sets up the web server and API endpoints
-	router.NewRouter(SabreClient)
+	router.NewRouter(FlightClient)
 }
