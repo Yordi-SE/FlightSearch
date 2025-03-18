@@ -7,7 +7,7 @@ import (
 )
 
 // New returns a new Router instance
-func NewRouter(FlightClient interfaces.UseScase) {
+func NewRouter(FlightClient interfaces.UseCase) {
 	router := gin.Default()
 
 	Controller := controller.NewController(FlightClient)

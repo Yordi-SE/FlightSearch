@@ -10,7 +10,7 @@ import (
 
 // Controller handles HTTP requests related to flight searches
 type Controller struct {
-	FlightClient interfaces.UseScase // Interface for interacting with flight search use case
+	FlightClient interfaces.UseCase // Interface for interacting with flight search use case
 }
 
 // NewController creates and initializes a new Controller instance
@@ -21,7 +21,7 @@ type Controller struct {
 // Returns:
 //
 //	Pointer to a new Controller instance
-func NewController(client interfaces.UseScase) *Controller {
+func NewController(client interfaces.UseCase) *Controller {
 	return &Controller{
 		FlightClient: client, // Inject the flight client dependency
 	}
