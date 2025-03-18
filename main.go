@@ -28,12 +28,7 @@ func main() {
 
 	// Create a new Sabre client instance with configuration details
 	// The client will be used to interact with Sabre's API
-	FlightClient := use_case.NewSabreClient(
-		Config.ClientID,     // Sabre API Client ID
-		Config.ClientSecret, // Sabre API Client Secret
-		Config.PCC,          // Pseudo City Code for agency identification
-		Config.URL,          // Sabre API endpoint URL
-	)
+	FlightClient := use_case.NewSabreClient(Config)
 
 	// Attempt to retrieve an authentication token from Sabre
 	// This is required before making any API calls

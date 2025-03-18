@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Yordi-SE/FlightSearch/config"
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"
 	"github.com/Yordi-SE/FlightSearch/utils"
 )
@@ -18,6 +19,7 @@ type SabreClient struct {
 	Token        string // Current access token (refreshed as needed)
 	URL          string // Sabre API endpoint URL
 	PCC          string // Pseudo City Code for agency identification
+	SABREAUTHURL string // Sabre authentication endpoint URL
 }
 
 // NewSabreClient creates and initializes a new SabreClient instance
@@ -31,12 +33,13 @@ type SabreClient struct {
 // Returns:
 //
 //	Pointer to a new SabreClient instance
-func NewSabreClient(clientID, clientSecret string, PCC string, url string) *SabreClient {
+func NewSabreClient(Config *config.Config) *SabreClient {
 	return &SabreClient{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		PCC:          PCC,
-		URL:          url,
+		ClientID:     Config.ClientID,
+		ClientSecret: Config.ClientSecret,
+		PCC:          Config.PCC,
+		URL:          Config.URL,
+		SABREAUTHURL: Config.SABREAUTHURL,
 	}
 }
 

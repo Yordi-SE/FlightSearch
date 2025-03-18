@@ -17,7 +17,7 @@ import (
 func (c *SabreClient) GetToken() error {
 	// Log the attempt to get a token (client ID and secret partially for debugging)
 	fmt.Println("Getting token", c.ClientID, c.ClientSecret)
-	url := "https://api.cert.sabre.com/v2/auth/token" // Sabre's certification token endpoint
+	url := c.SABREAUTHURL // Sabre's certification token endpoint
 
 	// Encode client ID and secret separately using base64
 	encodedID := base64.StdEncoding.EncodeToString([]byte(c.ClientID))

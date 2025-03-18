@@ -12,6 +12,7 @@ type Config struct {
 	ClientSecret string
 	PCC          string
 	URL          string
+	SABREAUTHURL string
 }
 
 // New returns a new Config instance
@@ -21,6 +22,7 @@ func New() (*Config, error) {
 		ClientSecret: os.Getenv("CLIENTSECRET"),
 		PCC:          os.Getenv("PCC"),
 		URL:          os.Getenv("URL"),
+		SABREAUTHURL: os.Getenv("SABREAUTHURL"),
 	}
 
 	if c.ClientID == "" {
@@ -31,6 +33,12 @@ func New() (*Config, error) {
 	}
 	if c.PCC == "" {
 		return nil, fmt.Errorf("PCC is required")
+	}
+	if c.SABREAUTHURL == "" {
+		return nil, fmt.Errorf("SABREAUTHURL is required")
+	}
+	if c.URL == "" {
+		return nil, fmt.Errorf("URL is required")
 	}
 
 	return c, nil
