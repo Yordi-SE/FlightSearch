@@ -34,15 +34,15 @@ func (r *FlightSearchRequest) Validate() error {
 	return nil
 }
 
-type Location struct {
+type RequestLocation struct {
 	LocationCode string `json:"LocationCode"`
 	LocationType string `json:"LocationType"`
 }
 
 type OriginDest struct {
-	OriginLocation      Location `json:"OriginLocation"`
-	DestinationLocation Location `json:"DestinationLocation"`
-	DepartureDateTime   string   `json:"DepartureDateTime"`
+	OriginLocation      RequestLocation `json:"OriginLocation"`
+	DestinationLocation RequestLocation `json:"DestinationLocation"`
+	DepartureDateTime   string          `json:"DepartureDateTime"`
 }
 
 type OTA_AirLowFareSearchRQ struct {
@@ -76,9 +76,9 @@ type CompanyName struct {
 
 // OriginDestinationInformation related structs
 type OriginDestinationInfo struct {
-	DepartureDateTime   string   `json:"DepartureDateTime"`
-	OriginLocation      Location `json:"OriginLocation"`
-	DestinationLocation Location `json:"DestinationLocation"`
+	DepartureDateTime   string          `json:"DepartureDateTime"`
+	OriginLocation      RequestLocation `json:"OriginLocation"`
+	DestinationLocation RequestLocation `json:"DestinationLocation"`
 }
 
 type VendorPref struct {

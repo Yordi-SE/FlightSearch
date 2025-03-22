@@ -27,27 +27,9 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 
 	// Create a mapping of flight schedules using schedule ID as key
 	// Stores essential flight details for quick lookup
-	scheduleMap := make(map[int]struct {
-		FlightNumber  string
-		Origin        string
-		Destination   string
-		DepartureTime string
-		ArrivalTime   string
-	})
+	scheduleMap := make(map[int]DTO.ScheduleDesc)
 	for _, sched := range resp.GroupedItineraryResponse.ScheduleDescs {
-		scheduleMap[sched.ID] = struct {
-			FlightNumber  string
-			Origin        string
-			Destination   string
-			DepartureTime string
-			ArrivalTime   string
-		}{
-			FlightNumber:  fmt.Sprintf("%s%d", sched.Carrier.Marketing, sched.Carrier.MarketingFlightNumber),
-			Origin:        sched.Departure.Airport,
-			Destination:   sched.Arrival.Airport,
-			DepartureTime: sched.Departure.Time,
-			ArrivalTime:   sched.Arrival.Time,
-		}
+		scheduleMap[sched.ID] = sched
 	}
 
 	// Create a mapping of leg descriptions to their schedule references
@@ -60,7 +42,7 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 		}
 		legMap[leg.ID] = schedRefs
 	}
-
+	fmt.Println(legMap)
 	// Process each itinerary group and its pricing information
 	for _, group := range resp.GroupedItineraryResponse.ItineraryGroups {
 		for _, itin := range group.Itineraries {
@@ -95,10 +77,10 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 					for idx, schedRef := range schedRefs {
 						if flightData, ok := scheduleMap[schedRef]; ok {
 							// Build baggage info for each passenger type
-							baggage := []DTO.BaggageInfo{}
+							baggage := []DTO.ResponseBaggageInfo{}
 							for _, p := range req.Passengers {
 								if allowance, exists := baggageInfo[idx]; exists {
-									baggage = append(baggage, DTO.BaggageInfo{
+									baggage = append(baggage, DTO.ResponseBaggageInfo{
 										PassengerType: p.Type,
 										Allowance:     allowance,
 									})
@@ -107,15 +89,13 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 
 							// Format departure time with date
 							departureDate := group.GroupDescription.LegDescriptions[i].DepartureDate
-							departureTime := fmt.Sprintf("%sT%s", departureDate, flightData.DepartureTime[:8])
+							departureTime := fmt.Sprintf("%sT%s", departureDate, flightData.Departure.Time[:8])
 
 							// Add flight to response
 							flights.Flights = append(flights.Flights, DTO.Flight{
-								FlightNumber:  flightData.FlightNumber,
-								Origin:        flightData.Origin,
-								Destination:   flightData.Destination,
 								DepartureTime: departureTime,
-								ArrivalTime:   fmt.Sprintf("%sT%s", departureDate, flightData.ArrivalTime[:8]),
+								ArrivalTime:   fmt.Sprintf("%sT%s", departureDate, flightData.Arrival.Time[:8]),
+								FlightData:    flightData,
 								Price:         totalPrice / float64(numLegs), // Split total price across legs
 								Baggage:       baggage,
 							})
@@ -153,11 +133,11 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 	// Build origin-destination information for one-way trip
 	originDest := []DTO.OriginDest{
 		{
-			OriginLocation: DTO.Location{
+			OriginLocation: DTO.RequestLocation{
 				LocationCode: req.Origin,
 				LocationType: "A", // Airport
 			},
-			DestinationLocation: DTO.Location{
+			DestinationLocation: DTO.RequestLocation{
 				LocationCode: req.Destination,
 				LocationType: "A",
 			},
@@ -168,8 +148,8 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 	// Add return leg if round trip
 	if req.TripType == "round_trip" {
 		originDest = append(originDest, DTO.OriginDest{
-			OriginLocation:      DTO.Location{LocationCode: req.Destination, LocationType: "A"},
-			DestinationLocation: DTO.Location{LocationCode: req.Origin, LocationType: "A"},
+			OriginLocation:      DTO.RequestLocation{LocationCode: req.Destination, LocationType: "A"},
+			DestinationLocation: DTO.RequestLocation{LocationCode: req.Origin, LocationType: "A"},
 			DepartureDateTime:   req.ReturnDateTime,
 		})
 	}

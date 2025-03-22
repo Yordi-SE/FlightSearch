@@ -61,7 +61,6 @@ func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSe
 
 	// Build the Sabre-specific request format from our internal request
 	sabreReq := utils.BuildSabreRequest(req, c.PCC)
-	fmt.Printf("Request: %+v\n", sabreReq) // Log request for debugging
 
 	// Marshal the request into JSON
 	payload, err := json.Marshal(sabreReq)
@@ -94,8 +93,6 @@ func (c *SabreClient) SearchFlights(req *DTO.FlightSearchRequest) (*DTO.FlightSe
 	}
 
 	// Log response details for debugging
-	fmt.Println("Status Code:", resp.StatusCode)
-	fmt.Println("Response Body:", string(body))
 
 	// Check if the request was successful
 	if resp.StatusCode != http.StatusOK {
