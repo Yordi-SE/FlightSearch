@@ -200,14 +200,6 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 					},
 				},
 			},
-			TravelPreferences: DTO.TravelPreferences{
-				MaxStopsQuantity: 0, // Direct flights only
-				VendorPref: []DTO.VendorPref{
-					{
-						Code: "LO", // Example airline code
-					},
-				},
-			},
 			TPA_Extensions: DTO.TPAExtensions{
 				IntelliSellTransaction: DTO.IntelliSellTransaction{
 					RequestType: DTO.RequestType{

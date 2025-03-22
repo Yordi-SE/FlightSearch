@@ -49,7 +49,6 @@ type OTA_AirLowFareSearchRQ struct {
 	Version                      string              `json:"Version"`
 	POS                          POS                 `json:"POS"`
 	OriginDestinationInformation []OriginDest        `json:"OriginDestinationInformation"`
-	TravelPreferences            TravelPreferences   `json:"TravelPreferences"`
 	TravelerInfoSummary          TravelerInfoSummary `json:"TravelerInfoSummary"`
 	TPA_Extensions               TPAExtensions       `json:"TPA_Extensions"`
 }
@@ -80,12 +79,6 @@ type OriginDestinationInfo struct {
 	DepartureDateTime   string   `json:"DepartureDateTime"`
 	OriginLocation      Location `json:"OriginLocation"`
 	DestinationLocation Location `json:"DestinationLocation"`
-}
-
-// TravelPreferences related structs
-type TravelPreferences struct {
-	MaxStopsQuantity int          `json:"MaxStopsQuantity"`
-	VendorPref       []VendorPref `json:"VendorPref"`
 }
 
 type VendorPref struct {
