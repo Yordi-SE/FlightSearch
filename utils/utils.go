@@ -42,7 +42,7 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 		}
 		legMap[leg.ID] = schedRefs
 	}
-	fmt.Println(legMap)
+	fmt.Println("legMap", legMap)
 	// Process each itinerary group and its pricing information
 	for _, group := range resp.GroupedItineraryResponse.ItineraryGroups {
 		for _, itin := range group.Itineraries {
@@ -51,19 +51,23 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 				if len(pricing.Fare.PassengerInfoList) == 0 {
 					continue
 				}
-				passengerInfo := pricing.Fare.PassengerInfoList[0].PassengerInfo
 				totalPrice := pricing.Fare.TotalFare.TotalPrice
-				numLegs := len(itin.Legs)
-
-				// Build baggage information mapping per segment
 				baggageInfo := make(map[int]string)
-				for _, bag := range passengerInfo.BaggageInformation {
-					if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
-						for _, seg := range bag.Segments {
-							baggageInfo[seg.ID] = allowance
+
+				for _, passenger := range pricing.Fare.PassengerInfoList {
+					passengerInfo := passenger.PassengerInfo
+
+					// Build baggage information mapping per segment for this passenger
+					for _, bag := range passengerInfo.BaggageInformation {
+						if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
+							for _, seg := range bag.Segments {
+								baggageInfo[seg.ID] = allowance
+							}
 						}
 					}
 				}
+				//
+				fmt.Println("baggageInfo", baggageInfo)
 
 				// Process each leg of the itinerary
 				for i, legRef := range itin.Legs {
@@ -74,6 +78,8 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 					}
 
 					// Process each schedule in the leg
+					schedules := []DTO.FlightDataScheduleDesc{}
+					var departureDate string
 					for idx, schedRef := range schedRefs {
 						if flightData, ok := scheduleMap[schedRef]; ok {
 							// Build baggage info for each passenger type
@@ -86,28 +92,29 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 									})
 								}
 							}
-
+							flightDataScheduleDesc := DTO.FlightDataScheduleDesc{
+								ScheduleDesc: flightData,
+								Baggage:      baggage,
+							}
+							schedules = append(schedules, flightDataScheduleDesc)
 							// Format departure time with date
-							departureDate := group.GroupDescription.LegDescriptions[i].DepartureDate
-							departureTime := fmt.Sprintf("%sT%s", departureDate, flightData.Departure.Time[:8])
 
 							// Add flight to response
-							flights.Flights = append(flights.Flights, DTO.Flight{
-								DepartureTime: departureTime,
-								ArrivalTime:   fmt.Sprintf("%sT%s", departureDate, flightData.Arrival.Time[:8]),
-								FlightData:    flightData,
-								Price:         totalPrice / float64(numLegs), // Split total price across legs
-								Baggage:       baggage,
-							})
+
 						}
 					}
+					departureDate = group.GroupDescription.LegDescriptions[i].DepartureDate
+					flights.Flights = append(flights.Flights, DTO.Flight{
+						DepartureDate: departureDate,
+						FlightData:    schedules,
+						Price:         fmt.Sprintf("%f %s", totalPrice, pricing.Fare.TotalFare.Currency),
+					})
 				}
 			}
 		}
 	}
 
 	// Log the number of flights parsed
-	fmt.Println("Parsed Flights:", len(flights.Flights))
 	return &flights, nil
 }
 

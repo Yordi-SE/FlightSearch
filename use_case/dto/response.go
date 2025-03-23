@@ -6,11 +6,14 @@ type ResponseBaggageInfo struct {
 }
 
 type Flight struct {
-	FlightData    ScheduleDesc          `json:"schedule_desc"`
-	DepartureTime string                `json:"departure_time"`
-	ArrivalTime   string                `json:"arrival_time"`
-	Price         float64               `json:"price"`
-	Baggage       []ResponseBaggageInfo `json:"baggage"`
+	FlightData    []FlightDataScheduleDesc `json:"flight_data"`
+	DepartureDate string                   `json:"departure_time"`
+	Price         string                   `json:"price"`
+}
+
+type FlightDataScheduleDesc struct {
+	ScheduleDesc ScheduleDesc          `json:"schedule_desc"`
+	Baggage      []ResponseBaggageInfo `json:"baggage"`
 }
 
 type FlightSearchResponse struct {
