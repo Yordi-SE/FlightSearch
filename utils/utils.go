@@ -2,6 +2,8 @@ package utils
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"
 )
@@ -16,106 +18,110 @@ import (
 //
 //	Pointer to FlightSearchResponse containing parsed flights and any error encountered
 func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*DTO.FlightSearchResponse, error) {
-	var flights DTO.FlightSearchResponse
+	flights := &DTO.FlightSearchResponse{}
 
-	// Create a mapping of baggage allowance descriptions using ID as key
-	// Format: "2PC" indicates 2 pieces allowed
-	baggageMap := make(map[int]string)
+	// Precompute mappings with capacity hints
+	baggageMap := make(map[int]string, len(resp.GroupedItineraryResponse.BaggageAllowanceDescs))
 	for _, allowance := range resp.GroupedItineraryResponse.BaggageAllowanceDescs {
 		baggageMap[allowance.ID] = fmt.Sprintf("%dPC", allowance.PieceCount)
 	}
 
-	// Create a mapping of flight schedules using schedule ID as key
-	// Stores essential flight details for quick lookup
-	scheduleMap := make(map[int]DTO.ScheduleDesc)
+	scheduleMap := make(map[int]DTO.ScheduleDesc, len(resp.GroupedItineraryResponse.ScheduleDescs))
 	for _, sched := range resp.GroupedItineraryResponse.ScheduleDescs {
 		scheduleMap[sched.ID] = sched
 	}
 
-	// Create a mapping of leg descriptions to their schedule references
-	// Maps leg ID to array of schedule IDs
-	legMap := make(map[int][]int)
+	legMap := make(map[int][]int, len(resp.GroupedItineraryResponse.LegDescs))
 	for _, leg := range resp.GroupedItineraryResponse.LegDescs {
-		var schedRefs []int
+		schedRefs := make([]int, 0, len(leg.Schedules))
 		for _, sched := range leg.Schedules {
 			schedRefs = append(schedRefs, sched.Ref)
 		}
 		legMap[leg.ID] = schedRefs
 	}
-	fmt.Println("legMap", legMap)
-	// Process each itinerary group and its pricing information
+
+	// Process itineraries
 	for _, group := range resp.GroupedItineraryResponse.ItineraryGroups {
 		for _, itin := range group.Itineraries {
-			for _, pricing := range itin.PricingInformation {
-				// Skip if no passenger info available
-				if len(pricing.Fare.PassengerInfoList) == 0 {
-					continue
-				}
-				totalPrice := pricing.Fare.TotalFare.TotalPrice
-				baggageInfo := make(map[int]string)
-
-				for _, passenger := range pricing.Fare.PassengerInfoList {
-					passengerInfo := passenger.PassengerInfo
-
-					// Build baggage information mapping per segment for this passenger
-					for _, bag := range passengerInfo.BaggageInformation {
-						if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
-							for _, seg := range bag.Segments {
-								baggageInfo[seg.ID] = allowance
-							}
-						}
-					}
-				}
-				//
-				fmt.Println("baggageInfo", baggageInfo)
-
-				// Process each leg of the itinerary
-				for i, legRef := range itin.Legs {
-					legID := legRef.Ref
-					schedRefs, ok := legMap[legID]
-					if !ok {
-						continue
-					}
-
-					// Process each schedule in the leg
-					schedules := []DTO.FlightDataScheduleDesc{}
-					var departureDate string
-					for idx, schedRef := range schedRefs {
-						if flightData, ok := scheduleMap[schedRef]; ok {
-							// Build baggage info for each passenger type
-							baggage := []DTO.ResponseBaggageInfo{}
-							for _, p := range req.Passengers {
-								if allowance, exists := baggageInfo[idx]; exists {
-									baggage = append(baggage, DTO.ResponseBaggageInfo{
-										PassengerType: p.Type,
-										Allowance:     allowance,
-									})
-								}
-							}
-							flightDataScheduleDesc := DTO.FlightDataScheduleDesc{
-								ScheduleDesc: flightData,
-								Baggage:      baggage,
-							}
-							schedules = append(schedules, flightDataScheduleDesc)
-							// Format departure time with date
-
-							// Add flight to response
-
-						}
-					}
-					departureDate = group.GroupDescription.LegDescriptions[i].DepartureDate
-					flights.Flights = append(flights.Flights, DTO.Flight{
-						DepartureDate: departureDate,
-						FlightData:    schedules,
-						Price:         fmt.Sprintf("%f %s", totalPrice, pricing.Fare.TotalFare.Currency),
-					})
-				}
-			}
+			processItinerary(itin, group, req, baggageMap, scheduleMap, legMap, flights)
 		}
 	}
 
-	// Log the number of flights parsed
-	return &flights, nil
+	// Sort flights by price
+	sort.Slice(flights.Flights, func(i, j int) bool {
+		priceI, _ := strconv.ParseFloat(flights.Flights[i].Price[:len(flights.Flights[i].Price)-4], 64) // Extract numeric part
+		priceJ, _ := strconv.ParseFloat(flights.Flights[j].Price[:len(flights.Flights[j].Price)-4], 64)
+		return priceI < priceJ
+	})
+
+	return flights, nil
+}
+
+// processItinerary processes a single itinerary and appends flights to the response.
+func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.FlightSearchRequest,
+	baggageMap map[int]string, scheduleMap map[int]DTO.ScheduleDesc, legMap map[int][]int,
+	flights *DTO.FlightSearchResponse) {
+	for _, pricing := range itin.PricingInformation {
+		if len(pricing.Fare.PassengerInfoList) == 0 {
+			continue
+		}
+
+		totalPrice := pricing.Fare.TotalFare.TotalPrice
+		priceStr := fmt.Sprintf("%f %s", totalPrice, pricing.Fare.TotalFare.Currency)
+
+		// Build itinerary-wide baggage info
+		baggageInfo := make(map[int]string)
+		for _, passenger := range pricing.Fare.PassengerInfoList {
+			for _, bag := range passenger.PassengerInfo.BaggageInformation {
+				if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
+					for _, seg := range bag.Segments {
+						baggageInfo[seg.ID] = allowance
+					}
+				}
+			}
+		}
+
+		// Process legs with global segment indexing
+		globalSegIdx := 0
+		for i, legRef := range itin.Legs {
+			schedRefs, ok := legMap[legRef.Ref]
+			if !ok {
+				globalSegIdx += len(schedRefs) // Keep index aligned
+				continue
+			}
+
+			schedules := make([]DTO.FlightDataScheduleDesc, 0, len(schedRefs))
+			departureDate := group.GroupDescription.LegDescriptions[i].DepartureDate
+
+			for _, schedRef := range schedRefs {
+				if flightData, ok := scheduleMap[schedRef]; ok {
+					baggage := make([]DTO.ResponseBaggageInfo, 0, len(req.Passengers))
+					if allowance, exists := baggageInfo[globalSegIdx]; exists {
+						for _, p := range req.Passengers {
+							baggage = append(baggage, DTO.ResponseBaggageInfo{
+								PassengerType: p.Type,
+								Allowance:     allowance,
+							})
+						}
+					}
+
+					schedules = append(schedules, DTO.FlightDataScheduleDesc{
+						ScheduleDesc: flightData,
+						Baggage:      baggage,
+					})
+				}
+				globalSegIdx++
+			}
+
+			if len(schedules) > 0 {
+				flights.Flights = append(flights.Flights, DTO.Flight{
+					DepartureDate: departureDate,
+					FlightData:    schedules,
+					Price:         priceStr,
+				})
+			}
+		}
+	}
 }
 
 // BuildSabreRequest constructs the request payload for Sabre API
