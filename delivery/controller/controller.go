@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	interfaces "github.com/Yordi-SE/FlightSearch/Interfaces" // Package defining use case interfaces
 	DTO "github.com/Yordi-SE/FlightSearch/use_case/dto"      // Package containing data transfer objects
 	"github.com/gin-gonic/gin"                               // Gin web framework for HTTP handling
@@ -52,7 +50,7 @@ func (ctrl *Controller) SearchFlights(c *gin.Context) {
 
 	// Call the use case to search for flights
 	result, err := ctrl.FlightClient.SearchFlights(&req)
-	fmt.Println(result) // Log the result for debugging purposes
+	// fmt.Println(result) // Log the result for debugging purposes
 
 	// If the search fails, return 500 Internal Server Error
 	if err != nil {

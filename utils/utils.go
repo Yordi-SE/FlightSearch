@@ -49,8 +49,8 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 
 	// Sort flights by price
 	sort.Slice(flights.Flights, func(i, j int) bool {
-		priceI, _ := strconv.ParseFloat(flights.Flights[i].Price[:len(flights.Flights[i].Price)-4], 64) // Extract numeric part
-		priceJ, _ := strconv.ParseFloat(flights.Flights[j].Price[:len(flights.Flights[j].Price)-4], 64)
+		priceI, _ := strconv.ParseFloat(flights.Flights[i].FlightData[0].TotalPrice[:len(flights.Flights[i].FlightData[0].TotalPrice)-4], 64) // Extract numeric part
+		priceJ, _ := strconv.ParseFloat(flights.Flights[j].FlightData[0].TotalPrice[:len(flights.Flights[j].FlightData[0].TotalPrice)-4], 64)
 		return priceI < priceJ
 	})
 
@@ -70,23 +70,39 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 		priceStr := fmt.Sprintf("%f %s", totalPrice, pricing.Fare.TotalFare.Currency)
 
 		// Build itinerary-wide baggage info
-		baggageInfo := make(map[int]string)
-		for _, passenger := range pricing.Fare.PassengerInfoList {
+		baggageInfo := make(map[string]struct {
+			PassengerNumber   int
+			Allowance         string
+			PricePerPassenger string
+			PassengerType     string
+		})
+
+		for idx, passenger := range pricing.Fare.PassengerInfoList {
 			for _, bag := range passenger.PassengerInfo.BaggageInformation {
+				fmt.Println("passengerType", passenger.PassengerInfo.PassengerType)
 				if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
 					for _, seg := range bag.Segments {
-						baggageInfo[seg.ID] = allowance
+						baggageInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)] = struct {
+							PassengerNumber   int
+							Allowance         string
+							PricePerPassenger string
+							PassengerType     string
+						}{
+							PassengerType:     passenger.PassengerInfo.PassengerType,
+							PassengerNumber:   passenger.PassengerInfo.PassengerNumber,
+							Allowance:         allowance,
+							PricePerPassenger: fmt.Sprintf("%f %s", passenger.PassengerInfo.PassengerTotalFare.TotalFare, passenger.PassengerInfo.PassengerTotalFare.Currency),
+						}
 					}
 				}
 			}
 		}
 
-		// Process legs with global segment indexing
 		globalSegIdx := 0
 		for i, legRef := range itin.Legs {
 			schedRefs, ok := legMap[legRef.Ref]
 			if !ok {
-				globalSegIdx += len(schedRefs) // Keep index aligned
+				globalSegIdx += len(schedRefs)
 				continue
 			}
 
@@ -96,11 +112,14 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 			for _, schedRef := range schedRefs {
 				if flightData, ok := scheduleMap[schedRef]; ok {
 					baggage := make([]DTO.ResponseBaggageInfo, 0, len(req.Passengers))
-					if allowance, exists := baggageInfo[globalSegIdx]; exists {
-						for _, p := range req.Passengers {
+
+					for idx := range req.Passengers {
+						if allowance, exists := baggageInfo[strconv.Itoa(globalSegIdx)+strconv.Itoa(idx)]; exists {
 							baggage = append(baggage, DTO.ResponseBaggageInfo{
-								PassengerType: p.Type,
-								Allowance:     allowance,
+								Allowance:         allowance.Allowance,
+								PricePerPassenger: allowance.PricePerPassenger,
+								PassengerNumber:   allowance.PassengerNumber,
+								PassengerType:     allowance.PassengerType,
 							})
 						}
 					}
@@ -108,6 +127,7 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 					schedules = append(schedules, DTO.FlightDataScheduleDesc{
 						ScheduleDesc: flightData,
 						Baggage:      baggage,
+						TotalPrice:   priceStr,
 					})
 				}
 				globalSegIdx++
@@ -117,7 +137,6 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 				flights.Flights = append(flights.Flights, DTO.Flight{
 					DepartureDate: departureDate,
 					FlightData:    schedules,
-					Price:         priceStr,
 				})
 			}
 		}

@@ -3,7 +3,7 @@ package DTO
 import "fmt"
 
 type Passenger struct {
-	Type  string `json:"type" binding:"required,oneof=ADT CNN INF"` // Adult, Child, Infant
+	Type  string `json:"type" binding:"required,oneof=ADT CNN INF C06"` // Adult, Child, Infant
 	Count int    `json:"count" binding:"required,min=1"`
 }
 

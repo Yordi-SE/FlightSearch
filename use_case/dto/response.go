@@ -1,19 +1,21 @@
 package DTO
 
 type ResponseBaggageInfo struct {
-	PassengerType string `json:"passenger_type"`
-	Allowance     string `json:"allowance"`
+	PassengerType     string `json:"passenger_type"`
+	Allowance         string `json:"allowance"`
+	PricePerPassenger string `json:"price_per_passenger"`
+	PassengerNumber   int    `json:"passenger_number"`
 }
 
 type Flight struct {
 	FlightData    []FlightDataScheduleDesc `json:"flight_data"`
 	DepartureDate string                   `json:"departure_time"`
-	Price         string                   `json:"price"`
 }
 
 type FlightDataScheduleDesc struct {
 	ScheduleDesc ScheduleDesc          `json:"schedule_desc"`
 	Baggage      []ResponseBaggageInfo `json:"baggage"`
+	TotalPrice   string                `json:"total_price"`
 }
 
 type FlightSearchResponse struct {
@@ -159,17 +161,31 @@ type Fare struct {
 type PassengerInfo struct {
 	PassengerInfo PassengerDetails `json:"passengerInfo"`
 }
+type PassengerTotalFare struct {
+	TotalFare            float64 `json:"totalFare"`
+	TotalTaxAmount       float64 `json:"totalTaxAmount"`
+	Currency             string  `json:"currency"`
+	BaseFareAmount       float64 `json:"baseFareAmount"`
+	BaseFareCurrency     string  `json:"baseFareCurrency"`
+	EquivalentAmount     float64 `json:"equivalentAmount"`
+	EquivalentCurrency   string  `json:"equivalentCurrency"`
+	ConstructionAmount   float64 `json:"constructionAmount"`
+	ConstructionCurrency string  `json:"constructionCurrency"`
+	CommissionPercentage float64 `json:"commissionPercentage"`
+	CommissionAmount     float64 `json:"commissionAmount"`
+	ExchangeRateOne      float64 `json:"exchangeRateOne"`
+}
 
 // PassengerDetails contains detailed passenger fare information
 type PassengerDetails struct {
-	PassengerType      string          `json:"passengerType"`
-	PassengerNumber    int             `json:"passengerNumber"`
-	NonRefundable      bool            `json:"nonRefundable"`
-	FareComponents     []FareComponent `json:"fareComponents"`
-	Taxes              []TaxRef        `json:"taxes"`
-	TaxSummaries       []TaxSummaryRef `json:"taxSummaries"`
-	PassengerTotalFare TotalFare       `json:"passengerTotalFare"`
-	BaggageInformation []BaggageInfo   `json:"baggageInformation"`
+	PassengerType      string             `json:"passengerType"`
+	PassengerNumber    int                `json:"passengerNumber"`
+	NonRefundable      bool               `json:"nonRefundable"`
+	FareComponents     []FareComponent    `json:"fareComponents"`
+	Taxes              []TaxRef           `json:"taxes"`
+	TaxSummaries       []TaxSummaryRef    `json:"taxSummaries"`
+	PassengerTotalFare PassengerTotalFare `json:"passengerTotalFare"`
+	BaggageInformation []BaggageInfo      `json:"baggageInformation"`
 }
 
 // FareComponent describes a component of the fare
