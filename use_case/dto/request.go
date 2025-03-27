@@ -49,8 +49,19 @@ type OTA_AirLowFareSearchRQ struct {
 	Version                      string              `json:"Version"`
 	POS                          POS                 `json:"POS"`
 	OriginDestinationInformation []OriginDest        `json:"OriginDestinationInformation"`
+	TravelPreferences            TravelPreferences   `json:"TravelPreferences"`
 	TravelerInfoSummary          TravelerInfoSummary `json:"TravelerInfoSummary"`
 	TPA_Extensions               TPAExtensions       `json:"TPA_Extensions"`
+}
+
+type TravelPreferences struct {
+	Baggage Baggage `json:"Baggage"`
+}
+
+type Baggage struct {
+	CarryOnInfo bool   `json:"CarryOnInfo"`
+	Description bool   `json:"Description"`
+	RequestType string `json:"RequestType"`
 }
 type SabreRequestFormat struct {
 	OTA_AirLowFareSearchRQ OTA_AirLowFareSearchRQ `json:"OTA_AirLowFareSearchRQ"`

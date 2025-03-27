@@ -13,13 +13,15 @@ type Flight struct {
 }
 
 type FlightDataScheduleDesc struct {
-	ScheduleDesc ScheduleDesc          `json:"schedule_desc"`
-	Baggage      []ResponseBaggageInfo `json:"baggage"`
-	TotalPrice   string                `json:"total_price"`
+	ScheduleDesc ScheduleDesc `json:"schedule_desc"`
+	Baggage      interface{}  `json:"baggage"`
 }
 
 type FlightSearchResponse struct {
-	Flights []Flight `json:"flights"`
+	Flights []struct {
+		Flights    []Flight `json:"flights"`
+		TotalPrice string
+	}
 }
 
 type SabreResponse struct {
@@ -28,13 +30,33 @@ type SabreResponse struct {
 
 // GroupedItineraryResponse represents the main response content
 type GroupedItineraryResponse struct {
-	Version               string             `json:"version"`
-	Messages              []Message          `json:"messages"`
-	Statistics            Statistics         `json:"statistics"`
-	ScheduleDescs         []ScheduleDesc     `json:"scheduleDescs"`
-	BaggageAllowanceDescs []BaggageAllowance `json:"baggageAllowanceDescs"`
-	LegDescs              []LegDesc          `json:"legDescs"`
-	ItineraryGroups       []ItineraryGroup   `json:"itineraryGroups"`
+	Version               string                 `json:"version"`
+	Messages              []Message              `json:"messages"`
+	Statistics            Statistics             `json:"statistics"`
+	ScheduleDescs         []ScheduleDesc         `json:"scheduleDescs"`
+	FareComponentDescs    []FareComponentType    `json:"fareComponentDescs"`
+	BaggageAllowanceDescs []BaggageAllowanceType `json:"baggageAllowanceDescs"`
+	BaggageChargeDescs    []BaggageChargeType    `json:"baggageChargeDescs"`
+	LegDescs              []LegDesc              `json:"legDescs"`
+	ItineraryGroups       []ItineraryGroup       `json:"itineraryGroups"`
+}
+type BaggageAllowanceType struct {
+	ID           int     `json:"id"` // Required field
+	Description1 *string `json:"description1,omitempty"`
+	Description2 *string `json:"description2,omitempty"`
+	PieceCount   *int    `json:"pieceCount,omitempty"`
+	Unit         *string `json:"unit,omitempty"`
+	Weight       *int    `json:"weight,omitempty"`
+}
+type BaggageChargeType struct {
+	ID                   int      `json:"id"`
+	Description1         *string  `json:"description1,omitempty"`
+	Description2         *string  `json:"description2,omitempty"`
+	EquivalentAmount     *float64 `json:"equivalentAmount,omitempty"`
+	EquivalentCurrency   *string  `json:"equivalentCurrency,omitempty"`
+	FirstPiece           *int     `json:"firstPiece,omitempty"`
+	LastPiece            *int     `json:"lastPiece,omitempty"`
+	NoChargeNotAvailable *string  `json:"noChargeNotAvailable,omitempty"`
 }
 
 // Message represents an individual message in the response
@@ -85,12 +107,6 @@ type Equipment struct {
 	Code            string `json:"code"`
 	TypeForFirstLeg string `json:"typeForFirstLeg"`
 	TypeForLastLeg  string `json:"typeForLastLeg"`
-}
-
-// BaggageAllowance describes baggage allowance details
-type BaggageAllowance struct {
-	ID         int `json:"id"`
-	PieceCount int `json:"pieceCount"`
 }
 
 // LegDesc describes a leg of a journey
@@ -178,14 +194,14 @@ type PassengerTotalFare struct {
 
 // PassengerDetails contains detailed passenger fare information
 type PassengerDetails struct {
-	PassengerType      string             `json:"passengerType"`
-	PassengerNumber    int                `json:"passengerNumber"`
-	NonRefundable      bool               `json:"nonRefundable"`
-	FareComponents     []FareComponent    `json:"fareComponents"`
-	Taxes              []TaxRef           `json:"taxes"`
-	TaxSummaries       []TaxSummaryRef    `json:"taxSummaries"`
-	PassengerTotalFare PassengerTotalFare `json:"passengerTotalFare"`
-	BaggageInformation []BaggageInfo      `json:"baggageInformation"`
+	PassengerType      string                   `json:"passengerType"`
+	PassengerNumber    int                      `json:"passengerNumber"`
+	NonRefundable      bool                     `json:"nonRefundable"`
+	FareComponents     []FareComponent          `json:"fareComponents"`
+	Taxes              []TaxRef                 `json:"taxes"`
+	TaxSummaries       []TaxSummaryRef          `json:"taxSummaries"`
+	PassengerTotalFare PassengerTotalFare       `json:"passengerTotalFare"`
+	BaggageInformation []BaggageInformationType `json:"baggageInformation"`
 }
 
 // FareComponent describes a component of the fare
@@ -235,11 +251,27 @@ type TotalFare struct {
 }
 
 // BaggageInfo contains baggage information for a passenger
-type BaggageInfo struct {
-	ProvisionType string       `json:"provisionType"`
-	AirlineCode   string       `json:"airlineCode"`
-	Segments      []SegmentRef `json:"segments"`
-	Allowance     AllowanceRef `json:"allowance"`
+type BaggageInformationType struct {
+	AirlineCode   string        `json:"airlineCode"` // Required field
+	Allowance     *Allowance    `json:"allowance,omitempty"`
+	Charge        *Charge       `json:"charge,omitempty"`
+	ProvisionType string        `json:"provisionType"` // Required field
+	Segments      []SegmentType `json:"segments"`      // Required field (array with minItems: 1)
+}
+
+// Allowance represents a reference to a Baggage Allowance ID
+type Allowance struct {
+	Ref int `json:"ref"`
+}
+
+// Charge represents a reference to a Baggage Charge ID
+type Charge struct {
+	Ref int `json:"ref"`
+}
+
+// Segment represents a segment index in the itinerary
+type SegmentType struct {
+	ID int `json:"id"` // Assuming 'id' as the property based on context
 }
 
 // SegmentRef references a segment in baggage info
@@ -250,4 +282,47 @@ type SegmentRef struct {
 // AllowanceRef references a baggage allowance
 type AllowanceRef struct {
 	Ref int `json:"ref"`
+}
+
+// FareComponentType represents a fare component in fareComponentDescs
+type FareComponentType struct {
+	ID                          int                    `json:"id"` // Required
+	GoverningCarrier            *string                `json:"governingCarrier,omitempty"`
+	FareAmount                  *float64               `json:"fareAmount,omitempty"`
+	FareCurrency                *string                `json:"fareCurrency,omitempty"`
+	FareBasisCode               *string                `json:"fareBasisCode,omitempty"`
+	FarePassengerType           *string                `json:"farePassengerType,omitempty"`
+	PublishedFareAmount         *float64               `json:"publishedFareAmount,omitempty"`
+	PublishedFareCurrency       *string                `json:"publishedFareCurrency,omitempty"`
+	OneWayFare                  *bool                  `json:"oneWayFare,omitempty"`
+	Directionality              *string                `json:"directionality,omitempty"`
+	Direction                   *string                `json:"direction,omitempty"`
+	NotValidAfter               *string                `json:"notValidAfter,omitempty"`
+	ApplicablePricingCategories *string                `json:"applicablePricingCategories,omitempty"`
+	VendorCode                  *string                `json:"vendorCode,omitempty"`
+	FareTypeBitmap              *string                `json:"fareTypeBitmap,omitempty"`
+	FareType                    *string                `json:"fareType,omitempty"`
+	FareTariff                  *string                `json:"fareTariff,omitempty"`
+	FareRule                    *string                `json:"fareRule,omitempty"`
+	CabinCode                   *string                `json:"cabinCode,omitempty"`
+	Segments                    []FareComponentSegment `json:"segments,omitempty"`
+}
+
+// FareComponentSegment represents a segment within a fare component
+type FareComponentSegment struct {
+	Segment *FareSegmentDetails `json:"segment,omitempty"`
+}
+
+// FareSegmentDetails contains segment-specific details
+type FareSegmentDetails struct {
+	Stopover   *bool       `json:"stopover,omitempty"`
+	Surcharges []Surcharge `json:"surcharges,omitempty"`
+}
+
+// Surcharge represents additional charges on a segment
+type Surcharge struct {
+	Amount      float64 `json:"amount"`
+	Currency    *string `json:"currency,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Type        *string `json:"type,omitempty"`
 }

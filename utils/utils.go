@@ -21,9 +21,19 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 	flights := &DTO.FlightSearchResponse{}
 
 	// Precompute mappings with capacity hints
-	baggageMap := make(map[int]string, len(resp.GroupedItineraryResponse.BaggageAllowanceDescs))
+	baggageMap := make(map[int]DTO.BaggageAllowanceType, len(resp.GroupedItineraryResponse.BaggageAllowanceDescs))
 	for _, allowance := range resp.GroupedItineraryResponse.BaggageAllowanceDescs {
-		baggageMap[allowance.ID] = fmt.Sprintf("%dPC", allowance.PieceCount)
+		baggageMap[allowance.ID] = allowance
+	}
+
+	fareComponentsMap := make(map[int]DTO.FareComponentType, len(resp.GroupedItineraryResponse.FareComponentDescs))
+	for _, fare := range resp.GroupedItineraryResponse.FareComponentDescs {
+		fareComponentsMap[fare.ID] = fare
+	}
+
+	baggageChargeMap := make(map[int]DTO.BaggageChargeType, len(resp.GroupedItineraryResponse.BaggageChargeDescs))
+	for _, charge := range resp.GroupedItineraryResponse.BaggageChargeDescs {
+		baggageChargeMap[charge.ID] = charge
 	}
 
 	scheduleMap := make(map[int]DTO.ScheduleDesc, len(resp.GroupedItineraryResponse.ScheduleDescs))
@@ -43,14 +53,14 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 	// Process itineraries
 	for _, group := range resp.GroupedItineraryResponse.ItineraryGroups {
 		for _, itin := range group.Itineraries {
-			processItinerary(itin, group, req, baggageMap, scheduleMap, legMap, flights)
+			processItinerary(itin, group, baggageMap, baggageChargeMap, scheduleMap, legMap, flights, fareComponentsMap)
 		}
 	}
 
 	// Sort flights by price
 	sort.Slice(flights.Flights, func(i, j int) bool {
-		priceI, _ := strconv.ParseFloat(flights.Flights[i].FlightData[0].TotalPrice[:len(flights.Flights[i].FlightData[0].TotalPrice)-4], 64) // Extract numeric part
-		priceJ, _ := strconv.ParseFloat(flights.Flights[j].FlightData[0].TotalPrice[:len(flights.Flights[j].FlightData[0].TotalPrice)-4], 64)
+		priceI, _ := strconv.ParseFloat(flights.Flights[i].TotalPrice[:len(flights.Flights[i].TotalPrice)-4], 64) // Extract numeric part
+		priceJ, _ := strconv.ParseFloat(flights.Flights[j].TotalPrice[:len(flights.Flights[j].TotalPrice)-4], 64)
 		return priceI < priceJ
 	})
 
@@ -58,9 +68,9 @@ func ParseSabreResponse(resp DTO.SabreResponse, req *DTO.FlightSearchRequest) (*
 }
 
 // processItinerary processes a single itinerary and appends flights to the response.
-func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.FlightSearchRequest,
-	baggageMap map[int]string, scheduleMap map[int]DTO.ScheduleDesc, legMap map[int][]int,
-	flights *DTO.FlightSearchResponse) {
+func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup,
+	baggageMap map[int]DTO.BaggageAllowanceType, baggageChargeMap map[int]DTO.BaggageChargeType, scheduleMap map[int]DTO.ScheduleDesc, legMap map[int][]int,
+	flights *DTO.FlightSearchResponse, fare map[int]DTO.FareComponentType) {
 	for _, pricing := range itin.PricingInformation {
 		if len(pricing.Fare.PassengerInfoList) == 0 {
 			continue
@@ -68,37 +78,37 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 
 		totalPrice := pricing.Fare.TotalFare.TotalPrice
 		priceStr := fmt.Sprintf("%f %s", totalPrice, pricing.Fare.TotalFare.Currency)
-
 		// Build itinerary-wide baggage info
-		baggageInfo := make(map[string]struct {
-			PassengerNumber   int
-			Allowance         string
-			PricePerPassenger string
-			PassengerType     string
-		})
-
+		fmt.Println(priceStr)
+		baggageInfo := make(map[string][]DTO.BaggageAllowanceType)
+		chargeInfo := make(map[string][]DTO.BaggageChargeType)
 		for idx, passenger := range pricing.Fare.PassengerInfoList {
 			for _, bag := range passenger.PassengerInfo.BaggageInformation {
-				fmt.Println("passengerType", passenger.PassengerInfo.PassengerType)
-				if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
-					for _, seg := range bag.Segments {
-						baggageInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)] = struct {
-							PassengerNumber   int
-							Allowance         string
-							PricePerPassenger string
-							PassengerType     string
-						}{
-							PassengerType:     passenger.PassengerInfo.PassengerType,
-							PassengerNumber:   passenger.PassengerInfo.PassengerNumber,
-							Allowance:         allowance,
-							PricePerPassenger: fmt.Sprintf("%f %s", passenger.PassengerInfo.PassengerTotalFare.TotalFare, passenger.PassengerInfo.PassengerTotalFare.Currency),
+				if bag.ProvisionType == "C" {
+					if charge, ok := baggageChargeMap[bag.Charge.Ref]; ok {
+						for _, seg := range bag.Segments {
+							chargeInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)] = append(chargeInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)], charge)
 						}
 					}
+				} else if allowance, ok := baggageMap[bag.Allowance.Ref]; ok {
+					for _, seg := range bag.Segments {
+						baggageInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)] = append(baggageInfo[strconv.Itoa(seg.ID)+strconv.Itoa(idx)], allowance)
+					}
+				}
+			}
+		}
+		fareInfo := make(map[string]DTO.FareComponentType)
+		for idx, passenger := range pricing.Fare.PassengerInfoList {
+			for id, passengerFare := range passenger.PassengerInfo.FareComponents {
+				if fareComp, ok := fare[passengerFare.Ref]; ok {
+					fareInfo[strconv.Itoa(id)+strconv.Itoa(idx)] = fareComp
 				}
 			}
 		}
 
 		globalSegIdx := 0
+		ItinFlights := make([]DTO.Flight, 0, len(itin.Legs))
+
 		for i, legRef := range itin.Legs {
 			schedRefs, ok := legMap[legRef.Ref]
 			if !ok {
@@ -111,34 +121,73 @@ func processItinerary(itin DTO.Itinerary, group DTO.ItineraryGroup, req *DTO.Fli
 
 			for _, schedRef := range schedRefs {
 				if flightData, ok := scheduleMap[schedRef]; ok {
-					baggage := make([]DTO.ResponseBaggageInfo, 0, len(req.Passengers))
+					var baggage = make([]struct {
+						Baggage         []DTO.BaggageAllowanceType
+						Charge          []DTO.BaggageChargeType
+						PassengerNumber int
+						PassengerType   string
+						NonRefundable   bool
+						FareComponent   struct {
+							FareComponent DTO.FareComponentType
+							BeginAirport  string
+							EndAirport    string
+						}
+					}, len(pricing.Fare.PassengerInfoList))
 
-					for idx := range req.Passengers {
+					for idx, passenger := range pricing.Fare.PassengerInfoList {
 						if allowance, exists := baggageInfo[strconv.Itoa(globalSegIdx)+strconv.Itoa(idx)]; exists {
-							baggage = append(baggage, DTO.ResponseBaggageInfo{
-								Allowance:         allowance.Allowance,
-								PricePerPassenger: allowance.PricePerPassenger,
-								PassengerNumber:   allowance.PassengerNumber,
-								PassengerType:     allowance.PassengerType,
-							})
+							baggage[idx].Baggage = append(baggage[idx].Baggage, allowance...)
+						}
+						if charge, exists := chargeInfo[strconv.Itoa(globalSegIdx)+strconv.Itoa(idx)]; exists {
+							baggage[idx].Charge = append(baggage[idx].Charge, charge...)
+						}
+						baggage[idx].PassengerNumber = passenger.PassengerInfo.PassengerNumber
+						baggage[idx].PassengerType = passenger.PassengerInfo.PassengerType
+						baggage[idx].NonRefundable = passenger.PassengerInfo.NonRefundable
+						available := false
+						for _, farecomp := range passenger.PassengerInfo.FareComponents {
+							if farecomp.BeginAirport == flightData.Departure.Airport && farecomp.EndAirport == flightData.Arrival.Airport {
+								baggage[idx].FareComponent.FareComponent = fare[farecomp.Ref]
+								baggage[idx].FareComponent.BeginAirport = farecomp.BeginAirport
+								baggage[idx].FareComponent.EndAirport = farecomp.EndAirport
+								available = true
+								break
+							}
+						}
+						if !available {
+							for _, farecomp := range passenger.PassengerInfo.FareComponents {
+								if farecomp.BeginAirport == group.GroupDescription.LegDescriptions[i].DepartureLocation && farecomp.EndAirport == group.GroupDescription.LegDescriptions[i].ArrivalLocation && len(farecomp.Segments) > 1 {
+									baggage[idx].FareComponent.FareComponent = fare[farecomp.Ref]
+									baggage[idx].FareComponent.BeginAirport = farecomp.BeginAirport
+									baggage[idx].FareComponent.EndAirport = farecomp.EndAirport
+									break
+								}
+							}
 						}
 					}
-
 					schedules = append(schedules, DTO.FlightDataScheduleDesc{
 						ScheduleDesc: flightData,
 						Baggage:      baggage,
-						TotalPrice:   priceStr,
 					})
 				}
 				globalSegIdx++
 			}
-
 			if len(schedules) > 0 {
-				flights.Flights = append(flights.Flights, DTO.Flight{
+				ItinFlights = append(ItinFlights, DTO.Flight{
 					DepartureDate: departureDate,
 					FlightData:    schedules,
 				})
 			}
+
+		}
+		if len(ItinFlights) > 0 {
+			flights.Flights = append(flights.Flights, struct {
+				Flights    []DTO.Flight "json:\"flights\""
+				TotalPrice string
+			}{
+				Flights:    ItinFlights,
+				TotalPrice: priceStr,
+			})
 		}
 	}
 }
@@ -210,6 +259,13 @@ func BuildSabreRequest(req *DTO.FlightSearchRequest, PCC string) DTO.SabreReques
 					{
 						PassengerTypeQuantity: passengers,
 					},
+				},
+			},
+			TravelPreferences: DTO.TravelPreferences{
+				Baggage: DTO.Baggage{
+					CarryOnInfo: true,
+					Description: true,
+					RequestType: "C",
 				},
 			},
 			TPA_Extensions: DTO.TPAExtensions{
